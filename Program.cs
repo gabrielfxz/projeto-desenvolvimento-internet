@@ -1,29 +1,48 @@
-
 using Microsoft.EntityFrameworkCore;
-
 using ProjetoEscola_API.Data;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+
+ConfigurationManager configuration = builder.Configuration;
 
 // Allow CORS
 var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
 
 builder.Services.AddCors(options =>
 {
-options.AddPolicy(MyAllowSpecificOrigins, builder => {
-builder.WithOrigins("http://localhost").AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
-builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
-builder.SetIsOriginAllowed(origin => new Uri(origin).Host == "localhost");
-builder.SetIsOriginAllowed(origin => true);
+  options.AddPolicy(MyAllowSpecificOrigins, builder => {
+  builder.WithOrigins("http://localhost").AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
+  builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
+  builder.SetIsOriginAllowed(origin => new Uri(origin).Host == "localhost");
+  builder.SetIsOriginAllowed(origin => true);
 });
 });
 
 // Add services to the container.
+builder.Services.AddAuthentication(options => {
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+
+// adding Jwt Bearer
+.AddJwtBearer(options => {
+    options.SaveToken = true;
+    options.RequireHttpsMetadata = false;
+    options.TokenValidationParameters = new TokenValidationParameters(){
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidAudience = configuration["JWT:ValidAudience"],
+        ValidIssuer = configuration["JWT:ValidIssuer"],
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["JWT:Secret"]))
+    };
+});
+
 builder.Services.AddControllers();
-
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-
 builder.Services.AddSwaggerGen();
 
 // Add DbContext
@@ -44,7 +63,9 @@ if (app.Environment.IsDevelopment())
 //Allow CORS
 app.UseCors(MyAllowSpecificOrigins);
 
-//app.UseHttpsRedirection();
+// authentication & authorization
+app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapControllers();
 app.Run();
